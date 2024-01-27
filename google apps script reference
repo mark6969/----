@@ -1,0 +1,113 @@
+function main() {
+  //version 20220616
+  let url = 'https://docs.google.com/spreadsheets/d/1kM_uVPNltmREId28yOrNB30whCYqFOB90xfQGAkpVx0/edit#gid=275932618';  //試算表網址,需要括在兩個單引號內
+  let isAllRequired = true;  //是否每題都要作答 true, false
+  let optionsSize = 4; //題目選項數, 4個表示2-4個選項都會計數到
+  let scores = 1;  //每題配分
+  let questionSize = 50; //匯入題目數
+
+  let exam = {};
+  exam.url = url;
+  exam.scores = scores;
+  exam.size = questionSize;
+  let getSheet = function (exam) {
+    let questions = [];
+    let SpreadSheet = SpreadsheetApp.openByUrl(exam.url);
+
+    let sheet = SpreadSheet.getSheets()[0];
+    let name = sheet.getSheetName();
+    exam.name = name;
+
+    for (let i = 2; i < exam.size + 2; i++) {
+      question = {};
+      if (!sheet.getRange(i, 1).isBlank()) {
+        question.description = sheet.getSheetValues(i, 1, 1, 1)[0][0];
+
+        question.answer = sheet.getSheetValues(i, 2, 1, 1)[0][0];
+        question.imgurl = sheet.getRange(i, 7).getValue();
+
+        let index = 1;
+        let options = [];
+
+        let startColumn = 3
+        //選項, 第三欄位到第六欄位,
+        for (let j = startColumn; j < startColumn + optionsSize; j++) {
+          if (!sheet.getRange(i, j).isBlank()) {
+            let option = {};
+            option.description = sheet.getSheetValues(i, j, 1, 1)[0][0];
+            option.value = parseInt(question.answer) === index ? true : false;
+            // options.push(option);
+
+            options = addOptions(options, option);
+
+          }
+          index += 1;
+        }
+
+        question.options = options;
+
+        questions.push(question);
+      }
+    }
+    exam.questions = questions;
+    return exam;
+  }
+
+  let addOptions = function (options, option) {
+    let isExist = false;
+    options.forEach((item) => {
+
+      if (item.description == option.description) {
+        isExist = true;
+      }
+    });
+
+    if (isExist == false) {
+      options.push(option);
+
+    }
+    return options;
+  }
+
+  let doExam = function (exam) {
+    let form = FormApp.create(exam.name);
+    form.setIsQuiz(true);
+    let questions = [];
+    questions = exam.questions;
+
+    questions.forEach((question) => {
+      if (question.imgurl.length > 0) {
+        let img = UrlFetchApp.fetch(question.imgurl);
+        form.addImageItem()
+          .setTitle("Q." + question.description)
+          .setImage(img);
+      }
+
+      let item = form.addMultipleChoiceItem();
+      item.setPoints(exam.scores);
+      let description = question.imgurl.length > 0 ? "A." : question.description
+      item.setTitle(description);
+      let options = [];
+      options = question.options;
+
+      let choices = [];
+
+      options.forEach((option) => {
+        choices.push(item.createChoice(option.description, option.value));
+        item.setChoices(choices);
+        item.setRequired(isAllRequired);
+      });
+
+    });
+
+
+    Logger.log(form.getEditUrl());
+  }
+
+  exam = getSheet(exam)
+  doExam(exam);
+
+}
+
+
+
